@@ -10,6 +10,18 @@ build). The frontend talks to Rust through Tauri's IPC bridge (`invoke`), so
 heavy or privileged work lives in Rust while the presentation layer stays in
 React.
 
+The UI has two full-screen views sharing one dark, green-accented theme:
+
+- **Quark Code** — an interactive terminal. It starts blank with a blinking
+  cursor and a prompt pinned to the bottom; typed lines bubble up into the
+  history above.
+- **Quark Chat** — a chat window with a collapsible sidebar of past
+  conversations and a message composer.
+
+Press **Ctrl+Tab** to switch between them. (⌘+Tab is also wired up, but macOS
+reserves it for the system app switcher, so it never reaches the app — Ctrl+Tab
+is the working shortcut.)
+
 ## Requirements
 
 - **Node.js** 18+ and **pnpm** 9+ — frontend tooling
@@ -37,15 +49,18 @@ quark/
 ├── vite.config.ts          # Vite config (React + Tailwind plugins, port 1420)
 ├── tsconfig.json           # TypeScript config for the frontend
 │
-├── src/                    # ── Frontend (React / TypeScript / Tailwind) ──
+├── frontend/               # ── Frontend (React / TypeScript / Tailwind) ──
 │   ├── main.tsx            #    React entry; mounts <App> and imports index.css
-│   ├── App.tsx             #    Root component (the "quark" test page)
-│   ├── index.css           #    Tailwind entry (@import "tailwindcss")
+│   ├── App.tsx             #    Root component; screen switching (Ctrl+Tab)
+│   ├── index.css           #    Tailwind entry + blinking-cursor keyframe
+│   ├── screens/
+│   │   ├── TerminalScreen.tsx  # "Quark Code" — interactive terminal
+│   │   └── ChatScreen.tsx      # "Quark Chat" — chat UI with sidebar
 │   └── vite-env.d.ts       #    Vite type shims
 │
 ├── public/                 # Static assets served as-is
 │
-└── src-tauri/              # ── Backend (Rust / Tauri) ──
+└── backend/                # ── Backend (Rust / Tauri) ──
     ├── Cargo.toml          #    Rust crate manifest and dependencies
     ├── tauri.conf.json     #    Tauri config: window, bundle, identifier, build hooks
     ├── build.rs            #    Tauri build script
@@ -56,9 +71,15 @@ quark/
         └── lib.rs          #    App setup, plugins, and #[tauri::command] handlers
 ```
 
+> **Note:** `frontend/` and `backend/` are renamed from Tauri's conventional
+> `src/` and `src-tauri/`. The Tauri CLI locates the backend by finding
+> `tauri.conf.json`, so the directory name is free to change; the frontend
+> entry is wired through `index.html` (`/frontend/main.tsx`) and
+> `tsconfig.json`.
+
 ### How the two halves connect
 
-- **Build wiring** lives in `src-tauri/tauri.conf.json`. `beforeDevCommand`
+- **Build wiring** lives in `backend/tauri.conf.json`. `beforeDevCommand`
   (`pnpm dev`) and `devUrl` (`http://localhost:1420`) point Tauri at Vite during
   development; `beforeBuildCommand` (`pnpm build`) and `frontendDist`
   (`../dist`) tell it where the compiled web assets are for a release build.
@@ -71,13 +92,13 @@ quark/
   ```
 
   `lib.rs` ships with an example `greet` command you can use as a template (it
-  is not wired into the current test page).
+  is not yet wired into the UI).
 
 ## Styling with Tailwind
 
 This project uses **Tailwind CSS v4**, configured through the
 `@tailwindcss/vite` plugin in `vite.config.ts` — there is no `tailwind.config.js`
-or PostCSS setup. The single line `@import "tailwindcss";` in `src/index.css`
+or PostCSS setup. The single line `@import "tailwindcss";` in `frontend/index.css`
 pulls in the framework, and utility classes are used directly in JSX. Customize
 the theme (colors, fonts, spacing) with an `@theme { … }` block in `index.css`.
 
@@ -92,7 +113,7 @@ the theme (colors, fonts, spacing) with an `@theme { … }` block in `index.css`
 | `pnpm preview`      | Preview the built frontend in a browser                   |
 
 To type-check the Rust backend without launching the app, run
-`cargo check` inside `src-tauri/`.
+`cargo check` inside `backend/`.
 
 ## Building for release
 
@@ -101,6 +122,6 @@ pnpm tauri build
 ```
 
 The bundled `.app` and `.dmg` are written to
-`src-tauri/target/release/bundle/`. App metadata (name, version, bundle
+`backend/target/release/bundle/`. App metadata (name, version, bundle
 identifier `com.gerardosalazar.quark`, window size, icons) is configured in
-`src-tauri/tauri.conf.json`.
+`backend/tauri.conf.json`.
